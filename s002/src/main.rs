@@ -17,6 +17,164 @@ fn main() {
     println!("--- 2.1.7 ---");
     i2_1_7();
     println!("---");
+    println!("--- 2.1.8 ---");
+    i2_1_8();
+    println!("---");
+    println!("--- 2.1.9 ---");
+    i2_1_9();
+    println!("---");
+    println!("--- 2.1.10 ---");
+    i2_1_10();
+    println!("---");
+    println!("--- 2.1.11 ---");
+    i2_1_11();
+    println!("---");
+    println!("--- 2.1.11 ---");
+    i2_1_12();
+    println!("---");
+}
+
+fn i2_1_12() {
+    // 型変換
+    let n: i32 = 100;
+    let m: i64 = n as i64;
+
+    let s: String = String::from("abc"); // &str -> Strring
+    let s2: String = "abc".into(); // &str -> String
+    let s3: String = s2.to_string(); // &str -> String
+}
+
+fn i2_1_11() {
+    // リンクリストを表すジェネリック型
+    {
+        enum List<T> {
+            Node { data: T, next: Box<List<T>> },
+            Nil, // null許可的な？
+        }
+
+        let n1 = List::<u32>::Nil;
+        let n2 = List::<u32>::Node {
+            data: 10,
+            next: Box::<List<u32>>::new(n1),
+        };
+        let n3 = List::Node {
+            data: 40,
+            // n2型から型推論
+            next: Box::new(n2),
+        };
+    }
+    // Option型とResult型
+    {
+        // 省略
+    }
+}
+
+fn i2_1_10() {
+    {
+        enum Dow {
+            Sunday,
+            Monday,
+            Tuesday,
+            Wednesday,
+            Thursday,
+            Friday,
+            Saturday,
+        }
+
+        enum Storage {
+            HDD { size: u32, rpm: u32 },
+            SSD(u32),
+        }
+
+        let hdd = Storage::HDD {
+            size: 512,
+            rpm: 7200,
+        };
+
+        let ssd = Storage::SSD(512);
+
+        // 構造体の宣言
+        struct PCSpec {
+            cpus: u16,
+            memory: u32,
+            storage: Storage,
+        }
+
+        let spec = PCSpec {
+            cpus: 8,
+            memory: 16,
+            storage: Storage::SSD(1024),
+        };
+
+        println!("{}", spec.cpus);
+
+        // フィールド名の省略
+        struct Dim2(u32, u32);
+        let d2 = Dim2(10, 20);
+        println!("{}", d2.0);
+
+        let r = &spec;
+        println!("{}", r.cpus); // 自動的に参照外し
+        println!("{}", (*r).cpus); // こう翔が冗長
+    }
+
+    // 参照外しの復習
+    {
+        let a = 24;
+        let a_ref = &a;
+        println!("a_ref: {}", a_ref); // これも自動的に参照外し(?)
+        println!("a_ref: {}", *a_ref); // 参照外し
+        println!("a_ref: {:p}", a_ref); // :pつけるとポインタ表示される
+    }
+
+    // ジェネリック関数
+    {
+        fn make_pair<T1, T2>(a: T1, b: T2) -> (T1, T2) {
+            (a, b)
+        }
+
+        make_pair::<u8, bool>(40, false);
+        make_pair(10, true);
+    }
+
+    // 定数を受け取るジェネリック型の例
+    {
+        struct Buffer<const S: usize> {
+            buf: [u8; S],
+        }
+        let buf = Buffer::<128> { buf: [0; 128] };
+    }
+
+    // Option型とResult型
+    {
+        enum Option<T> {
+            Some(T),
+        }
+    }
+}
+
+fn i2_1_9() {
+    fn do_it(f: fn(u32, u32) -> u32, a: u32, b: u32) {
+        println!("{}", f(a, b))
+    }
+
+    fn add(a: u32, b: u32) -> u32 {
+        a + b
+    }
+
+    fn mul(a: u32, b: u32) -> u32 {
+        a * b
+    }
+
+    do_it(add, 10, 2);
+    do_it(mul, 10, 2)
+}
+
+fn i2_1_8() {
+    // 0次元のタプルの型は()と表される。ユニット型と呼ばれる。
+    fn func() -> () {}
+
+    fn func2() {}
 }
 
 fn i2_1_7() {
