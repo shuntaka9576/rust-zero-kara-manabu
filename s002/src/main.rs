@@ -32,6 +32,249 @@ fn main() {
     println!("--- 2.1.11 ---");
     i2_1_12();
     println!("---");
+    println!("--- 2.2.1 ---");
+    i2_2_1();
+    println!("---");
+    println!("--- 2.2.2 ---");
+    i2_2_2();
+    println!("---");
+    println!("--- 2.2.2 ---");
+    i2_2_3();
+    println!("---");
+    println!("--- 2.2.4 ---");
+    i2_2_4();
+    println!("---");
+    println!("--- 2.2.5 ---");
+    i2_2_5();
+    println!("---");
+    println!("--- 2.2.6 ---");
+    i2_2_6();
+    println!("---");
+}
+
+fn i2_2_6() {
+    fn average(v: &[f32]) -> Option<f32> {
+        if v.is_empty() {
+            return None;
+        }
+
+        let mut total = 0.0;
+        for n in v {
+            total += n;
+        }
+
+        Some(total / v.len() as f32)
+    }
+
+    let a = [20.0, 10.0];
+    let n = average(&a);
+    match n {
+        Some(value) => {
+            println!("{}", value);
+        }
+        None => {
+            println!("error")
+        }
+    }
+    let b: [f32; 0] = [];
+    let n2 = average(&b);
+}
+
+fn i2_2_5() {
+    enum Storage {
+        SSD(u32),
+    }
+
+    // 構造体の宣言
+    struct PCSpec {
+        cpus: u16,
+        memory: u32,
+        storage: Storage,
+    }
+
+    let spec = PCSpec {
+        cpus: 8,
+        memory: 16,
+        storage: Storage::SSD(1024),
+    };
+
+    match &spec {
+        PCSpec {
+            storage: Storage::SSD(512),
+            ..
+        } => {
+            println!("512GiB SSD")
+        }
+        PCSpec {
+            cpus: 4 | 8,
+            memory: m,
+            storage: _,
+        } => {
+            println!("4 or 8 CPUs");
+            println!("{}GiB memory", *m);
+        }
+        PCSpec { memory: m, .. } if *m < 4 => {
+            println!("4GiBより少ないメモリ")
+        }
+        _ => (), // 全パターンマッチ
+    };
+}
+
+fn i2_2_4() {
+    {
+        fn sumup_loop(mut n: u64) -> u64 {
+            let mut total = 0;
+
+            loop {
+                if n == 0 {
+                    break;
+                }
+                total += n;
+                n -= 1;
+            }
+            total
+        }
+
+        let a = sumup_loop(24);
+        println!("a: {}", a);
+    }
+
+    // whileの例
+    {
+        fn sumup_while(mut n: u64) -> u64 {
+            let mut total = 0;
+            while n > 0 {
+                total += n;
+                n -= 1;
+            }
+            total
+        }
+    }
+
+    // forの例
+    {
+        fn sumup_for(n: u64) -> u64 {
+            let mut total = 0;
+            for x in 0..=n {
+                total += x;
+            }
+            total
+        }
+
+        {
+            for x in 0..10 {
+                println!("x: {x}");
+            }
+        }
+    }
+
+    // ラベルの例
+    {
+        'main_loop: loop {
+            loop {
+                println!("label loop");
+
+                break 'main_loop;
+            }
+        }
+    }
+
+    {
+        let v = [3, 8, 11, 15];
+        let mut result = 0;
+        for x in v.iter() {
+            if *x % 2 == 0 {
+                continue;
+            }
+            result += *x;
+        }
+        println!("result: {result}")
+    }
+}
+
+fn i2_2_3() {
+    fn sump(n: u64) -> u64 {
+        if n == 0 {
+            0
+        } else {
+            n + sump(n - 1)
+        }
+    }
+
+    {
+        // uだとコンパイルエラー
+        let n: i32 = -24;
+        let b = if n < 0 {
+            println!("nがマイナスの値です");
+            n //ここがないとユニット型が返却されるため、コンパイルエラー
+        } else {
+            n * n
+        };
+
+        println!("b の値は{}", b)
+    }
+}
+
+fn i2_2_2() {
+    fn func(a: u32, b: u32) {
+        {
+            let n: u32 = a + b;
+            let m = a + b; // 型推論
+        }
+
+        {
+            // 未初期化変数読み出しのコンパイルエラー
+            // let a: u32;
+            // a + 10;
+        }
+
+        let n = 10;
+        {
+            let m = 200;
+            let r = m + n;
+        }
+        // mは別スコープのため、コンパイルエラー
+        // let p = m + n;
+    }
+
+    // シャドーイングの例
+    {
+        fn maybe_fail() -> Option<u32> {
+            Some(10)
+        }
+
+        let result = maybe_fail();
+        let result = result.unwrap();
+        println!("result: {}", result);
+    }
+}
+
+fn i2_2_1() {
+    // 関数定義
+    fn hello() {
+        struct Msg {
+            msg1: &'static str,
+            msg2: &'static str,
+        }
+
+        fn print_msg(msg: &Msg) {
+            println!("{}{}", msg.msg1, msg.msg2);
+        }
+
+        let msg = Msg {
+            msg1: "Helllo, ",
+            msg2: "world!",
+        };
+
+        print_msg(&msg)
+    }
+
+    fn add(a: u32, b: u32) -> u32 {
+        a + b
+    }
+    let a = add(1, 3);
+
+    println!("a: {a}")
 }
 
 fn i2_1_12() {
