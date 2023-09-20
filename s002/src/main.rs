@@ -1,3 +1,18 @@
+use matches::assert_matches;
+
+#[derive(Debug)]
+enum Storage {
+    HDD { size: u32, rpm: u32 },
+    SSD(u32),
+}
+
+// 構造体の宣言
+struct PCSpec {
+    cpus: u16,
+    memory: u32,
+    storage: Storage,
+}
+
 fn main() {
     println!("--- 2.1.1 ---");
     i2_1_1();
@@ -50,6 +65,183 @@ fn main() {
     println!("--- 2.2.6 ---");
     i2_2_6();
     println!("---");
+    println!("--- 2.2.7 ---");
+    i2_2_7();
+    println!("---");
+    println!("--- 2.2.8 ---");
+    i2_2_8();
+    println!("---");
+    println!("--- 2.2.9 ---");
+    i2_2_9();
+    println!("---");
+    println!("--- 2.2.10 ---");
+    i2_2_10();
+    println!("---");
+}
+
+fn i2_2_10() {
+    // compile-time constant
+    const PI: f64 = 3.141592;
+
+    // static variable
+    static A: u32 = 100;
+    static mut B: u32 = 200;
+}
+
+fn i2_2_9() {
+    {
+        fn get_size(s: &Storage) -> u32 {
+            match s {
+                Storage::HDD { size: s, .. } => *s,
+                Storage::SSD(s) => *s,
+            }
+        };
+
+        impl Storage {
+            // メソッド
+            fn get_size(&self) -> u32 {
+                match self {
+                    Storage::HDD { size: s, .. } => *s,
+                    Storage::SSD(s) => *s,
+                }
+            }
+
+            fn set_size(&mut self, size: u32) {
+                match self {
+                    Storage::HDD { size: s, .. } => *s = size,
+                    Storage::SSD(s) => *s = size,
+                }
+            }
+        }
+
+        let mut s = Storage::SSD(512);
+        println!("before: {:?}", s);
+        let size = s.get_size();
+        s.set_size(1024);
+        println!("size: {},after: {:?}", size, s);
+    }
+
+    {
+        impl PCSpec {
+            // 型関連関数(associated function)、第一引数がselfではない
+            fn new(cpus: u16, memory: u32, storage: Storage) -> PCSpec {
+                PCSpec {
+                    cpus,
+                    memory,
+                    storage,
+                }
+            }
+        }
+
+        let s = Storage::SSD(512);
+        let spec = PCSpec::new(8, 32, s);
+    }
+
+    {
+        impl Storage {
+            const MAX: usize = 1024;
+        }
+    }
+}
+
+fn i2_2_8() {
+    {
+        // クロージャ
+        // 普通
+        let f = |a, b| a + b;
+        let n = f(10, 20);
+
+        //FIXME: 引数にStorageをとるクロージャが作れない..
+        // let f3 = |a: &Storage| match a {
+        //     Storage::HDD { size: s, .. } => *s += 64,
+        //     _ => (),
+        // };
+        // f3(s)
+    }
+
+    // クロージャf
+    {
+        {
+            let mut s = Storage::SSD(512);
+            let mut f = || match &mut s {
+                Storage::HDD { size: s, .. } => *s += 64,
+                _ => (),
+            };
+            f();
+            println!("{:#?}", s);
+        }
+
+        {
+            // クロージャfの環境
+            struct Env_f<'a> {
+                storate: &'a mut Storage, // 参照を持つ
+            }
+
+            // クロージャfのファットポイント
+            struct Clousure_f<'a> {
+                ptr_func: fn(),          // 関数へのポインタ
+                ptr_env: Box<Env_f<'a>>, // 環境へのポインタ
+            }
+        }
+    }
+
+    // クロージャg
+    {
+        {
+            let mut s = Storage::SSD(512);
+            let mut g = move || match &mut s {
+                Storage::HDD { size: s, .. } => *s += 64,
+                _ => (),
+            };
+            g();
+            // println!("{:#?}", s); // moveしているのでエラー
+        }
+
+        {
+            // moveを使ったとき、クロージャfとの比較になる
+            // クロージャgの環境
+            struct Env_g {
+                storage: Storage, // 参照ではなく値をもつ
+            }
+
+            // クロージャgのファットポインタ
+            struct Clousure_g {
+                ptr_func: fn(),      // 関数へのポインタ
+                ptr_env: Box<Env_g>, // 環境へのポインタ
+            }
+        }
+    }
+}
+
+fn i2_2_7() {
+    // マクロ
+    {
+        // assert系
+        let a = Some(10);
+        assert_matches!(a, Some(_)); // これはマッチする
+        assert_matches!(a, Some(10)); // これはマッチする
+
+        // マッチしない
+        // assert_matches!(a, Some(12));
+    }
+
+    {
+        // print!系マクロ
+        let n = 56;
+        println!("{}", n);
+        println!("{:>04}", 56); // 右寄せ4桁 4桁以下の場合0で埋める
+        println!("{:#x}", n); // x->16, o->8, b->2進数。#は0x 0o 0bあり
+        println!("{:x}", n); // 0xなし16進数
+        println!("{:#016x}", n); // 0xあり。16進数を16桁で表し、16桁以下は0で上位の値を埋める
+        println!("{:#o}", n);
+        println!("{:#b}", n);
+        let s = Storage::HDD {
+            size: 2048,
+            rpm: 7200,
+        };
+        println!("{:?}", s); // derive(Debug)がないと表示不可
+        println!("{:#?}", s); // 同様
+    }
 }
 
 fn i2_2_6() {
@@ -77,21 +269,9 @@ fn i2_2_6() {
         }
     }
     let b: [f32; 0] = [];
-    let n2 = average(&b);
 }
 
 fn i2_2_5() {
-    enum Storage {
-        SSD(u32),
-    }
-
-    // 構造体の宣言
-    struct PCSpec {
-        cpus: u16,
-        memory: u32,
-        storage: Storage,
-    }
-
     let spec = PCSpec {
         cpus: 8,
         memory: 16,
@@ -322,11 +502,6 @@ fn i2_1_10() {
             Thursday,
             Friday,
             Saturday,
-        }
-
-        enum Storage {
-            HDD { size: u32, rpm: u32 },
-            SSD(u32),
         }
 
         let hdd = Storage::HDD {
