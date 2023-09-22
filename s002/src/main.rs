@@ -1,5 +1,7 @@
 use matches::assert_matches;
-use std::collections::LinkedList;
+use std::collections::{BTreeSet, LinkedList};
+use std::thread;
+use std::time::Duration;
 
 #[derive(Debug)]
 enum Storage {
@@ -85,28 +87,244 @@ fn main() {
     println!("--- 2.2.13 ---");
     i2_2_13();
     println!("---");
+    println!("--- 2.2.14 ---");
+    i2_2_14();
+    println!("---");
+    println!("--- 2.2.15 ---");
+    i2_2_15();
+    println!("---");
+}
+
+fn i2_2_15() {
+    // マルチスレッド
+    {
+        // spawnとjoin
+        fn worker() -> u32 {
+            println!("start worker");
+            // thread::sleep(Duration::from_millis(1000));
+            println!("fin worker");
+            100
+        }
+
+        let handler = std::thread::spawn(worker);
+
+        // joinで待ち受け
+        match handler.join() {
+            Ok(n) => println!("{n}"),
+            Err(e) => println!("{:?}", e),
+        }
+    }
+
+    // チャンネル
+    {
+        println!("  チャンネル");
+        let (tx, rx) = std::sync::mpsc::sync_channel(64);
+
+        let handler = std::thread::spawn(move || match rx.recv() {
+            Ok((x, y)) => println!("({}, {})", x, y),
+            Err(e) => eprintln!("{e}"),
+        });
+
+        if let Err(e) = tx.send((10, 20)) {
+            eprintln!("{e}");
+        }
+
+        if let Err(e) = handler.join() {
+            eprintln!("{:?}", e);
+        }
+    }
+
+    // スレッドを用いた2つのVec値を並列にソートする
+    {
+        // xorshiftに疑似乱数生成
+        struct XOR64 {
+            x: u64,
+        }
+
+        impl XOR64 {
+            fn new(seed: u64) -> XOR64 {
+                XOR64 {
+                    x: seed ^ 88172645463325252,
+                }
+            }
+
+            fn next(&mut self) -> u64 {
+                let x = self.x;
+                let x = x ^ (x << 13);
+                let x = x ^ (x >> 7);
+                let x = x ^ (x >> 17);
+                self.x = x;
+
+                return x;
+            }
+        }
+
+        const NUM: usize = 200000000;
+        fn randomized_vec() -> (Vec<u64>, Vec<u64>) {
+            let mut v1 = Vec::new();
+            let mut v2 = Vec::new();
+
+            let mut generator = XOR64::new(1234);
+
+            for _ in 0..NUM {
+                let x1 = generator.next();
+                let x2 = generator.next();
+                v1.push(x1);
+                v2.push(x2);
+            }
+
+            (v1, v2)
+        }
+
+        fn single_threaded() {
+            println!("start!");
+            let (mut v1, mut v2) = randomized_vec();
+
+            let start = std::time::Instant::now(); // 現在時刻
+
+            v1.sort();
+            v2.sort();
+
+            let end = start.elapsed();
+
+            println!(
+                "single_threaded: {}.{:03}秒",
+                end.as_secs(),
+                end.subsec_nanos()
+            );
+            println!("end")
+        }
+
+        fn multi_threaded() {
+            let (mut v1, mut v2) = randomized_vec();
+            let start = std::time::Instant::now();
+
+            let handler1 = std::thread::spawn(move || {
+                v1.sort();
+                v1
+            });
+
+            let handler2 = std::thread::spawn(move || {
+                v2.sort();
+                v2
+            });
+            let _v1 = handler1.join().unwrap();
+            let _v2 = handler2.join().unwrap();
+            let end = start.elapsed();
+
+            println!(
+                "multi_threaded: {}.{:03}秒",
+                end.as_secs(),
+                end.subsec_nanos()
+            );
+        }
+
+        single_threaded();
+        multi_threaded();
+    }
+}
+
+fn i2_2_14() {
+    // イテレーター
+    {
+        let mut s = BTreeSet::new();
+        s.insert(100);
+        s.insert(400);
+        s.insert(6);
+        s.insert(1);
+
+        for n in s.iter() {
+            println!("{n}")
+        }
+    }
+
+    // イテレーターメソッドの使い方
+    {
+        let mut v = Vec::new();
+        v.push(10);
+        v.push(5);
+
+        let mut s = BTreeSet::new();
+        s.insert(100);
+        s.insert(400);
+
+        // Vec型とBtreeSet型をイテレーターに変換して連結
+        let it = v.iter().chain(s.iter());
+
+        // 各要素を2倍にして出力
+        // cloneの意味(?)
+        for n in it.clone().map(|n| n * 2) {
+            println!("n: {n}")
+        }
+
+        // 各要素の合計を計算
+        let total = it.clone().fold(0, |acc, x| acc + x);
+
+        // mapでprintlnする方法
+
+        // filterで偶数のみを取り出し、collectでLinkedListに変換
+        let list: LinkedList<_> = it.filter(|n| *n % 2 == 0).collect();
+
+        for a in list.iter() {
+            // 10, 100, 400の偶数だけ出力
+            println!("iter {a}");
+        }
+
+        // vの要素とsの要素をとタプルで結合
+        for (n, m) in v.iter().zip(s.iter()) {
+            println!("({n}, {m})")
+        }
+    }
 }
 
 fn i2_2_13() {
     // コレクション
 
     // -- LinkedList ---
-    let mut list1 = LinkedList::new();
-    list1.push_back(0); // [0]
-    list1.push_back(1);
-    list1.push_back(2);
+    {
+        let mut list1 = LinkedList::new();
+        list1.push_back(0); // [0]
+        list1.push_back(1);
+        list1.push_back(2);
 
-    let mut list2 = LinkedList::new();
-    list2.push_back(100);
-    list2.push_back(200);
-    list2.push_back(300);
+        let mut list2 = LinkedList::new();
+        list2.push_back(100);
+        list2.push_back(200);
+        list2.push_back(300);
 
-    list1.append(&mut list2); // list1 = [0, 1, 2, 100, 200, 300]
-                              // list2 == []
-    list1.push_front(-10); // list1 = [-10,0, 1, 2, 100, 200, 300]
-    for n in list1 {
-        println!("{n}")
+        list1.append(&mut list2); // list1 = [0, 1, 2, 100, 200, 300]
+                                  // list2 == []
+        list1.push_front(-10); // list1 = [-10,0, 1, 2, 100, 200, 300]
+        for n in &list1 {
+            // &にしないと後続のlist1でコンパイルエラーになる(所有権周り?)
+            println!("linked list for {n}")
+        }
+
+        for n in list1.iter() {
+            println!("linked list iter: {n}")
+        }
     }
+
+    // -- BTreeMap --
+    {
+        use std::collections::BTreeMap;
+        let mut m = BTreeMap::new();
+        m.insert(1, "apple");
+        m.insert(1, "orange");
+        m.insert(3, "banana");
+
+        if let Some(old) = m.remove(&2) {
+            // 2に対応する値を削除
+            println!("old: {old}");
+        }
+
+        if let Some(value) = m.get(&3) {
+            // 3に対応する値への不変参照を取得
+            println!("{value}");
+        }
+    }
+
+    // --- set ---
 }
 
 fn i2_2_11() {
