@@ -1,4 +1,5 @@
 use matches::assert_matches;
+use std::collections::LinkedList;
 
 #[derive(Debug)]
 enum Storage {
@@ -77,6 +78,39 @@ fn main() {
     println!("--- 2.2.10 ---");
     i2_2_10();
     println!("---");
+    println!("--- 2.2.11 ---");
+    i2_2_11();
+    println!("---");
+    // 2.2.12は命名規則なのでなし
+    println!("--- 2.2.13 ---");
+    i2_2_13();
+    println!("---");
+}
+
+fn i2_2_13() {
+    // コレクション
+
+    // -- LinkedList ---
+    let mut list1 = LinkedList::new();
+    list1.push_back(0); // [0]
+    list1.push_back(1);
+    list1.push_back(2);
+
+    let mut list2 = LinkedList::new();
+    list2.push_back(100);
+    list2.push_back(200);
+    list2.push_back(300);
+
+    list1.append(&mut list2); // list1 = [0, 1, 2, 100, 200, 300]
+                              // list2 == []
+    list1.push_front(-10); // list1 = [-10,0, 1, 2, 100, 200, 300]
+    for n in list1 {
+        println!("{n}")
+    }
+}
+
+fn i2_2_11() {
+    // unsafe {signal(Signal::SIGTOU, SigHandler:SigIgn).unwarp()}
 }
 
 fn i2_2_10() {
