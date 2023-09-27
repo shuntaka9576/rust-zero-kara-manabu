@@ -1,3 +1,10 @@
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, Mutex, RwLock},
+    thread::sleep,
+    time::Duration,
+};
+
 fn main() {
     // スタックメモリ
     s_3_1();
@@ -18,6 +25,106 @@ fn main() {
     println!("--- 3.4.2 ---");
     s_3_4_2();
     println!("---");
+
+    println!("--- 3.5 ---");
+    s_3_5();
+    println!("---");
+}
+
+fn s_3_5() {
+    // Arcの利用
+    {
+        let v = Arc::new(vec![1, 2, 3]);
+        let w = v.clone(); // 参照カウント = 2
+        let z = v.clone(); // 参照カウント = 3
+    }
+
+    // ミューテックスの利用
+    {
+        let x = Arc::new(Mutex::new(100_000)); // Mutex型の値を生成
+        let x2 = x.clone(); // 参照カウンタをインクリメント
+
+        let h1 = std::thread::spawn(move || {
+            // スレッド
+            let mut guard = x.lock().unwrap();
+            *guard -= 20_000; // ガードを参照して保護対象データにアクセス
+        });
+
+        // x1にすると所有権?の影響かコンパイルエラーになる。
+        // 複数スレッド間で値を共有する場合、cloneしてスマートポインタを用意するのが良さそう？
+        let h2 = std::thread::spawn(move || {
+            let mut guard = x2.lock().unwrap();
+            *guard -= 30_000; // ガードを参照して保護対象データにアクセス
+        });
+
+        h1.join().unwrap();
+        h2.join().unwrap();
+    }
+
+    {
+        // 借用と排他制御の類似性
+        // ---借用
+        // * ある時点で、書き込み可能な状態にある変数(参照を含む)は、最大1つである。
+        // * ある時点で、不変参照が1つ以上存在する場合、書き込み可能な状態にある変数(参照を含む)は1つも存在しない
+        // ---
+        // ---RW
+        // * ある時点で、ロック獲得中のライターは最大1つである。
+        // * ある時点で、ロック獲得中のリーダーが1つ以上存在する場合、ロック獲得中のライターは1つも存在しない
+        // ---
+        let mut gallery = BTreeMap::new();
+        gallery.insert("葛飾北斎", "富嶽三十六景 神奈川沖浪裏");
+        gallery.insert("ミュシャ", "黄道十二宮");
+
+        // RwLockとArcを利用して共有可能に
+        let gallery = Arc::new(RwLock::new(gallery));
+
+        let mut hdls = Vec::new();
+        for n in 0..3 {
+            // 客を表すスレッドを生成
+            let gallery = gallery.clone(); // 参照カウンタをインクリメント
+            let hdl = std::thread::spawn(move || {
+                for _ in 0..8 {
+                    {
+                        // readで取得したguard経由で書き込みはできない
+                        let guard = gallery.read().unwrap();
+                        if n == 0 {
+                            // 美術館の展示内容を表示
+                            for (key, value) in guard.iter() {
+                                print!("{key}:{value}");
+                            }
+                            println!();
+                        }
+                    }
+                    sleep(Duration::from_secs(1))
+                }
+            });
+            hdls.push(hdl)
+        }
+
+        // 美術館スタッフ
+        let staff = std::thread::spawn(move || {
+            for n in 0..4 {
+                // 展示内容を入れ替え
+                if n % 2 == 0 {
+                    let mut guard = gallery.write().unwrap(); // ライトロック
+                    guard.clear();
+                    guard.insert("ゴッホ", "星月夜");
+                    guard.insert("エッシャー", "滝");
+                } else {
+                    let mut guard = gallery.write().unwrap(); // ライトロック
+                    guard.clear();
+                    guard.insert("葛飾北斎", "富嶽三十六景 神奈川沖浪裏");
+                    guard.insert("ミュシャ", "黄道十二宮");
+                }
+                sleep(Duration::from_secs(2));
+            }
+        });
+
+        for hdl in hdls {
+            hdl.join().unwrap();
+        }
+        staff.join().unwrap();
+    }
 }
 
 fn s_3_4_2() {
@@ -91,8 +198,10 @@ fn s_3_4_2() {
             scaler: 3,
         };
 
-        // let v = xy.get_vec();
+        let v = xy.get_vec();
         // xy.update(v); // `xy`は借用されているためコンパイルエラー
+
+        // get_vec()で返される可変参照がvに借用されているため、update()で必要な&mut selfが借用できない
 
         println!("{:?}", xy);
     }
