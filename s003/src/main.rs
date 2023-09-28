@@ -1,5 +1,6 @@
 use std::{
     collections::BTreeMap,
+    fmt::{Display, Formatter},
     sync::{Arc, Mutex, RwLock},
     thread::sleep,
     time::Duration,
@@ -27,8 +28,95 @@ fn main() {
     println!("---");
 
     println!("--- 3.5 ---");
-    s_3_5();
+    // s_3_5(); // 実行時間がかかるためコメントアウト
     println!("---");
+
+    println!("--- 4.1 ---");
+    s_4_1();
+    println!("---");
+    println!("--- 4.2 ---");
+    s_4_2();
+    println!("---");
+}
+
+fn s_4_2() {
+    #[derive(Debug, Clone)]
+    enum List<T> {
+        Node { data: T, next: Box<List<T>> },
+        Nil,
+    }
+
+    impl<T> List<T> {
+        fn new() -> List<T> {
+            List::Nil
+        }
+
+        /// リストを消費して、そのリストの先頭に引数dataを追加したリストを返す
+        fn cons(self, data: T) -> List<T> {
+            List::Node {
+                data,
+                next: Box::new(self),
+            }
+        }
+
+        /// 不変イテレータを返す
+        fn iter<'a>(&'a self) -> ListIter<'a, T> {
+            ListIter { elm: self }
+        }
+    }
+
+    struct ListIter<'a, T> {
+        elm: &'a List<T>,
+    }
+
+    impl<'a, T> Iterator for ListIter<'a, T> {
+        // typeキーワードで関連型(associated type)を定義できる
+        type Item = &'a T; // イテレータが指す要素の型
+
+        fn next(&mut self) -> Option<Self::Item> {
+            match self.elm {
+                List::Node { data, next } => {
+                    self.elm = next;
+                    Some(data)
+                }
+                List::Nil => None,
+            }
+        }
+    }
+
+    {
+        let list = List::new().cons(0).cons(1).cons(2);
+
+        for x in list.iter() {
+            println!("{x}");
+        }
+
+        println!();
+
+        let mut it = list.iter();
+        println!("{:?}", it.next().unwrap());
+        println!("{:?}", it.next().unwrap());
+        println!("{:?}", it.next().unwrap());
+    }
+}
+
+fn s_4_1() {
+    struct ImaginaryNumber {
+        real: f64,
+        img: f64,
+    }
+
+    impl Display for ImaginaryNumber {
+        fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+            write!(f, "{} + {}i", self.real, self.img)
+        }
+    }
+
+    let n = ImaginaryNumber {
+        real: 3.0,
+        img: 4.0,
+    };
+    println!("{n}");
 }
 
 fn s_3_5() {
@@ -342,4 +430,10 @@ fn s_3_1() {
             let f = 60;
         }
     }
+}
+
+// ---練習---
+// s_4_2(イテレーター実装)を何も見ないで書いてみるところ
+fn s_4_2_pra() {
+    // TODO
 }
