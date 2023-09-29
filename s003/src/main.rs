@@ -1,8 +1,16 @@
+use serde::{Deserialize, Serialize};
 use std::{
+    any::{Any, TypeId},
     collections::BTreeMap,
-    fmt::{Display, Formatter},
+    error::Error,
+    fmt::{write, Debug, Display, Formatter},
+    fs::File,
+    io::{Read, Write},
+    ops::Mul,
+    path::Path,
+    rc::Rc,
     sync::{Arc, Mutex, RwLock},
-    thread::sleep,
+    thread::{self, sleep},
     time::Duration,
 };
 
@@ -37,6 +45,371 @@ fn main() {
     println!("--- 4.2 ---");
     s_4_2();
     println!("---");
+    println!("--- 4.2 pra ---");
+    s_4_2_pra();
+    println!("---");
+    println!("--- 4.3 ---");
+    // s_4_3(); // watchオプションでファイル変化を検知してしまうため(多分)
+    println!("---");
+    println!("--- 4.4 ---");
+    s_4_4();
+    println!("---");
+    println!("--- 4.5 ---");
+    s_4_5();
+    println!("--- 4.6 ---");
+    s_4_6();
+    println!("---");
+    println!("--- 4.7 ---");
+    s_4_7();
+    println!("---");
+}
+
+fn s_4_7() {
+    // 存在型
+
+    {
+        fn closure() -> impl Fn(i32) -> i32 {
+            |x| x * x
+        }
+    }
+
+    {
+        let f = |x: i32| x * x;
+        let g = |x: i32| x * x;
+
+        fn get_type_id<T: Any>(_: &T) -> TypeId {
+            TypeId::of::<T>()
+        }
+
+        println!("{}", get_type_id(&f) == get_type_id(&g)); // falseになる
+    }
+
+    {}
+}
+
+fn s_4_6() {
+    {
+        trait Location {
+            fn address(&self) -> &str;
+        }
+
+        trait Person {
+            fn name(&self) -> &str;
+        }
+
+        // LocationとPersonのスーパートレイト
+        trait House: Location + Person {}
+
+        fn print_house_info(house: &dyn House) {
+            println!("所有者: {}", house.name());
+            println!("住所: {}", house.address());
+        }
+
+        struct MyHouse {
+            owner: String,
+            address: String,
+        }
+
+        impl Location for MyHouse {
+            fn address(&self) -> &str {
+                &self.address
+            }
+        }
+
+        impl Person for MyHouse {
+            fn name(&self) -> &str {
+                &self.owner
+            }
+        }
+
+        impl House for MyHouse {}
+
+        let my_house = MyHouse {
+            owner: "かぐや姫".to_string(),
+            address: "ムーンベース3丁目1番地".to_string(),
+        };
+
+        print_house_info(&my_house)
+    }
+}
+
+fn s_4_5() {
+    {
+        trait Foo {
+            fn foo(&self);
+        }
+
+        struct Bar;
+        impl Foo for Bar {
+            fn foo(&self) {
+                println!("Bar:foo");
+            }
+        }
+
+        struct Buzz;
+        impl Foo for Buzz {
+            fn foo(&self) {
+                println!("Buzz:foo");
+            }
+        }
+
+        // コンパイル時にTが決定される
+        fn call_foo_static<T: Foo>(arg: &T) {
+            arg.foo();
+        }
+
+        // 実行時に呼び出し先が決定される
+        fn call_foo_dynamic(arg: &dyn Foo) {
+            arg.foo();
+        }
+
+        let bar = Bar;
+        let buzz = Buzz;
+
+        // 静的ディスパッチ
+        call_foo_static(&bar);
+        call_foo_static(&buzz);
+
+        // 動的ディスパッチ
+        call_foo_dynamic(&bar);
+        call_foo_dynamic(&buzz);
+    }
+
+    {
+        // 定義ジャンプして、実装しないといけないトレイトを確認する
+        // pub trait Error: Debug + Display {
+        //     fn source(&self) -> Option<&(dyn Error + 'static)> { ... }
+        //     fn backtrace(&self) -> Option<&Backtrcae> { ... }
+        //     fn description(&self) -> &str { ... }
+        //     fn caause(&self) -> Option<&dyn Error> { ... }
+        // }
+
+        // Error: Debug + Display
+        // Displayで、Errorトレイト実装するには、DebugとDeisplayトレイトを実装する必要がある
+        // デフォルト実装されているものは自分dね実装する必要はない
+
+        #[derive(Debug)]
+        struct ErrorA;
+
+        impl Display for ErrorA {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "Error A")
+            }
+        }
+
+        impl Error for ErrorA {} // Error を ErrorAに実装
+
+        // エラーBを定義
+        #[derive(Debug)]
+        struct ErrorB;
+
+        impl Display for ErrorB {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "Error B")
+            }
+        }
+
+        impl Error for ErrorB {}
+        fn error_a() -> Result<(), ErrorA> {
+            Err(ErrorA)
+        }
+
+        fn error_b() -> Result<(), ErrorB> {
+            Err(ErrorB)
+        }
+
+        fn error_ab() -> Result<(), Box<dyn std::error::Error>> {
+            error_a()?;
+            error_b()?;
+            Ok(())
+        }
+
+        // 存在型は静的ディスパッチであるため、複数の型を返すような関数を定義するとコンパイルエラーとなる
+        // 複数の型を返却する場合、前述のように動的ディスパッチを利用するのが良い
+        fn error_ab_impl(flag: bool) -> impl std::error::Error {
+            ErrorA
+            // これだとコンパイルエラー
+            // if flag {
+            //     ErrorA
+            // }
+            // else {
+            //     ErrorB
+            // }
+        }
+    }
+}
+
+// トレイト制約
+fn s_4_4() {
+    {
+        {
+            /// T: Mul<Output = T> + Copy
+            /// 型引数Tが std::ops::Mulトレイトと、Copyトレイトを実装していなければならないという制約
+            /// Output = Tは、std::ops::Mulトレイトの関連型Outputの型はT型であるという意味
+            fn square<T>(x: T) -> T
+            where
+                T: Mul<Output = T> + Copy,
+            {
+                x * x
+            }
+
+            // pub trait Mul<Rhs = Self> {
+            // type Output;
+            // fn mul(self, rhs: Rhs) -> Self::Output;
+            // }
+        }
+
+        // 別の書き方
+        {
+            // 型引数Tの後にコロンでトレイト制約を記述
+            fn square<T: Mul<Output = T> + Copy>(x: T) -> T {
+                x * x
+            }
+        }
+    }
+
+    {
+        // Arcで複数のスレッド間で参照を受け渡しする例
+        {
+            let n = Arc::new(10);
+            thread::spawn(move || println!("{n}"));
+        }
+
+        // Rcを複数のスレッド間で共有してコンパイルエラーとなる例
+        {
+            let n = Rc::new(10);
+
+            // コンパイルエラー
+            // thread::spawn(|| {
+            //     println!("{n}");
+            // });
+            // error[E0277]: `Rc<i32>` cannot be shared between threads safely
+            //    --> src/main.rs:97:27
+            //     |
+            // 97  |               thread::spawn(|| {
+            //     |  _____________-------------_^
+            //     | |             |
+            //     | |             required by a bound introduced by this call
+            // 98  | |                 println!("{n}");
+            // 99  | |             });
+            //     | |_____________^ `Rc<i32>` cannot be shared between threads safely
+            //         }
+            //     }
+        }
+
+        // Rcを別の型で包んでみる
+        // 基本コンパイルエラーになる。Rustだとコンパイル時に検出できるため、比較的容易に安全な並行プログラミングが可能
+        {
+            // ---
+            let n = Arc::new(Rc::new(10));
+            // thread::spawn(move || println!("{n}"))
+
+            // ---
+            let n2 = Arc::new(Mutex::new(Rc::new(10)));
+            // thread::spawn(move || {
+            //     let n = n2.lock().unwrap();
+            //     println!("{n}")
+            // });
+        }
+    }
+}
+
+fn s_4_3() {
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    enum List<T> {
+        Node { data: T, next: Box<List<T>> },
+        Nil,
+    }
+
+    impl<T> List<T> {
+        fn new() -> List<T> {
+            List::Nil
+        }
+
+        fn cons(self, data: T) -> List<T> {
+            List::Node {
+                data,
+                next: Box::new(self),
+            }
+        }
+
+        fn iter<'a>(&'a self) -> ListIter<'a, T> {
+            ListIter { elm: self }
+        }
+    }
+
+    struct ListIter<'a, T> {
+        elm: &'a List<T>,
+    }
+
+    impl<'a, T> Iterator for ListIter<'a, T> {
+        type Item = &'a T;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            match self.elm {
+                List::Node { data, next } => {
+                    self.elm = next;
+                    Some(data)
+                }
+                List::Nil => None,
+            }
+        }
+    }
+
+    // Listのシリアライズとデシリアライズ
+    {
+        let list = List::new().cons(1).cons(2).cons(3);
+
+        for i in list.iter() {
+            println!("check: {i}")
+        }
+
+        // シリアライズ
+        let js = serde_json::to_string(&list).unwrap();
+        println!("JSON: {} bytes", js.len());
+        println!("{js}");
+
+        let yml = serde_yaml::to_string(&list).unwrap();
+        println!("YAML: {} bytes", yml.len());
+        println!("{yml}");
+
+        let msgpack = rmp_serde::to_vec(&list).unwrap();
+        println!("MessagePack: {} bytes", msgpack.len());
+
+        // デシリアライズ
+        let list = serde_json::from_str::<List<i32>>(&js).unwrap();
+        println!("{:?}", list);
+
+        let list = serde_yaml::from_str::<List<i32>>(&yml).unwrap();
+        println!("{:?}", list);
+
+        let list = rmp_serde::from_slice::<List<i32>>(&msgpack).unwrap();
+        println!("{:?}", list);
+    }
+
+    // ファイルへの書き出し
+    {
+        let list = List::new().cons(1).cons(2).cons(3);
+        let yml = serde_yaml::to_string(&list).unwrap();
+
+        // ファイルへの書き出し
+        let path = Path::new("test.yml");
+        let mut f = File::create(path).unwrap();
+        f.write_all(yml.as_bytes()).unwrap();
+    }
+
+    // ファイルからの読み出し
+    {
+        println!("読み出し");
+        let path = Path::new("test.yml");
+        let mut f = File::open(path).unwrap();
+        let mut yml = String::new();
+        f.read_to_string(&mut yml).unwrap();
+
+        // YAMLからデシリアライズ
+        let list = serde_yaml::from_str::<List<i32>>(&yml).unwrap();
+        println!("{:?}", list);
+    }
 }
 
 fn s_4_2() {
@@ -47,6 +420,9 @@ fn s_4_2() {
     }
 
     impl<T> List<T> {
+        // なぜNil?
+        // おそらく即時でList<T>型をを返却できるから
+        // 後でconsを使っていく設計(?)
         fn new() -> List<T> {
             List::Nil
         }
@@ -65,6 +441,7 @@ fn s_4_2() {
         }
     }
 
+    // このライフタイム解釈がわからない(?)
     struct ListIter<'a, T> {
         elm: &'a List<T>,
     }
@@ -434,6 +811,4 @@ fn s_3_1() {
 
 // ---練習---
 // s_4_2(イテレーター実装)を何も見ないで書いてみるところ
-fn s_4_2_pra() {
-    // TODO
-}
+fn s_4_2_pra() {}
