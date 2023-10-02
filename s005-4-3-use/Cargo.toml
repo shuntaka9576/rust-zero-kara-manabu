@@ -1,0 +1,11 @@
+[package]
+name = "s005-4-3-use"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+s005-4-3 = { path="../s005-4-3" }
+# gitを利用することも可能
+# s005-4-3 = { git="gitのリポジトリURL" }
