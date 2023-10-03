@@ -15,6 +15,10 @@ pub enum AST {
     Seq(Vec<AST>),
 }
 
+pub enum ParserError {
+    InvalidEscape(usize, char),
+}
+
 // fn take() {
 //     let mut n = Some(10);
 //     let v = take(&mut n);
