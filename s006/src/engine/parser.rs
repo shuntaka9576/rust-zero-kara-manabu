@@ -114,52 +114,57 @@ pub fn parse(expr: &str) -> Result<AST, ParseError> {
         Escape,
     }
 
-    let mut seq = Vec::new();
-    let mut seq_or = Vec::new();
-    let mut stack = Vec::new();
-    let mut state = ParseState::Char;
+    let mut seq = Vec::new(); // 現在のSeqのコンテキスト (2)
+    let mut seq_or = Vec::new(); // 現在のOrのコンテキスト
+    let mut stack = Vec::new(); // コンテキストのスタック
+    let mut state = ParseState::Char; // 現在の状態
 
     for (i, c) in expr.chars().enumerate() {
+        // (3)
         match &state {
-            ParseState::Char => match c {
-                '+' => parse_plus_star_question(&mut seq, PSQ::Plus, i)?,
-                '*' => parse_plus_star_question(&mut seq, PSQ::Star, i)?,
-                '?' => parse_plus_star_question(&mut seq, PSQ::Question, i)?,
-                '(' => {
-                    let prev = take(&mut seq);
-                    let prev_or = take(&mut seq_or);
-                    stack.push((prev, prev_or));
-                }
-                ')' => {
-                    if let Some((mut prev, prev_or)) = stack.pop() {
-                        if !seq.is_empty() {
-                            seq_or.push(AST::Seq(seq));
-                        }
-
-                        if let Some(ast) = fold_or(seq_or) {
-                            prev.push(ast);
-                        }
-
-                        seq = prev;
-                        seq_or = prev_or;
-                    } else {
-                        // "abc)"のように、開き括弧がないのに閉じ括弧がある場合はエラー
-                        return Err(Box::new(ParseError::InvalidRightParen(i)));
-                    }
-                }
-                '|' => {
-                    if seq.is_empty() {
-                        return Err(Box::new(ParseError::NoPrev(i)));
-                    } else {
+            ParseState::Char => {
+                match c {
+                    '+' => parse_plus_star_question(&mut seq, PSQ::Plus, i)?,
+                    '*' => parse_plus_star_question(&mut seq, PSQ::Star, i)?,
+                    '?' => parse_plus_star_question(&mut seq, PSQ::Question, i)?,
+                    '(' => {
                         let prev = take(&mut seq);
-                        seq_or.push(AST::Seq(prev));
+                        let prev_or = take(&mut seq_or);
+                        stack.push((prev, prev_or));
                     }
-                }
-                '\\' => state = ParseState::Escape,
-                _ => seq.push(AST::Char(c)),
-            },
+                    ')' => {
+                        if let Some((mut prev, prev_or)) = stack.pop() {
+                            if !seq.is_empty() {
+                                seq_or.push(AST::Seq(seq));
+                            }
+
+                            if let Some(ast) = fold_or(seq_or) {
+                                prev.push(ast);
+                            }
+
+                            seq = prev;
+                            seq_or = prev_or;
+                        } else {
+                            // "abc)"のように、開き括弧がないのに閉じ括弧がある場合はエラー
+                            return Err(Box::new(ParseError::InvalidRightParen(i)));
+                        }
+                    }
+                    '|' => {
+                        if seq.is_empty() {
+                            return Err(Box::new(ParseError::NoPrev(i)));
+                        } else {
+                            let prev = take(&mut seq);
+                            seq_or.push(AST::Seq(prev));
+                        }
+                    }
+                    '\\' => state = ParseState::Escape,
+                    _ => seq.push(AST::Char(c)),
+                };
+            }
             ParseState::Escape => {
                 let ast = parse_escape(i, c)?;
+                seq.push(ast);
+                state = ParseState::Char;
             }
         }
     }
