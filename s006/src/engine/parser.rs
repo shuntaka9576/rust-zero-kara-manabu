@@ -105,6 +105,7 @@ fn fold_or(mut seq_or: Vec<AST>) -> Option<AST> {
     }
 }
 
+#[rustfmt::skip]
 pub fn parse(expr: &str) -> Result<AST, ParseError> {
     // 内部状態を表現するための型
     // Char 状態: 文字列処理中
@@ -119,22 +120,23 @@ pub fn parse(expr: &str) -> Result<AST, ParseError> {
     let mut stack = Vec::new(); // コンテキストのスタック
     let mut state = ParseState::Char; // 現在の状態
 
-    for (i, c) in expr.chars().enumerate() {
-        // (3)
+    for (i, c) in expr.chars().enumerate() { // (3)
         match &state {
             ParseState::Char => {
                 match c {
-                    '+' => parse_plus_star_question(&mut seq, PSQ::Plus, i)?,
+                    '+' => parse_plus_star_question(&mut seq, PSQ::Plus, i)?, // (4)
                     '*' => parse_plus_star_question(&mut seq, PSQ::Star, i)?,
                     '?' => parse_plus_star_question(&mut seq, PSQ::Question, i)?,
                     '(' => {
+                        // 現在のコンテキストをスタックに保存し、
+                        // 現在のコンテキストを空の状態にする
                         let prev = take(&mut seq);
                         let prev_or = take(&mut seq_or);
                         stack.push((prev, prev_or));
                     }
                     ')' => {
                         if let Some((mut prev, prev_or)) = stack.pop() {
-                            if !seq.is_empty() {
+                            if !seq.is_empty() { // seqが空でない場合
                                 seq_or.push(AST::Seq(seq));
                             }
 
@@ -158,7 +160,7 @@ pub fn parse(expr: &str) -> Result<AST, ParseError> {
                         }
                     }
                     '\\' => state = ParseState::Escape,
-                    _ => seq.push(AST::Char(c)),
+                    _ => seq.push(AST::Char(c)), // charはここで単にコンテキストに保存される
                 };
             }
             ParseState::Escape => {
