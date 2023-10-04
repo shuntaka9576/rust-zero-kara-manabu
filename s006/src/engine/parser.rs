@@ -146,12 +146,12 @@ pub fn parse(expr: &str) -> Result<AST, ParseError> {
                             seq_or = prev_or;
                         } else {
                             // "abc)"のように、開き括弧がないのに閉じ括弧がある場合はエラー
-                            return Err(Box::new(ParseError::InvalidRightParen(i)));
+                            return Err(ParseError::InvalidRightParen(i));
                         }
                     }
                     '|' => {
                         if seq.is_empty() {
-                            return Err(Box::new(ParseError::NoPrev(i)));
+                            return Err(ParseError::NoPrev(i));
                         } else {
                             let prev = take(&mut seq);
                             seq_or.push(AST::Seq(prev));
@@ -170,7 +170,7 @@ pub fn parse(expr: &str) -> Result<AST, ParseError> {
     }
 
     if !stack.is_empty() {
-        return Err(Box::new(ParseError::NoRightParen));
+        return Err(ParseError::NoRightParen);
     }
 
     if !seq.is_empty() {
@@ -180,6 +180,6 @@ pub fn parse(expr: &str) -> Result<AST, ParseError> {
     if let Some(ast) = fold_or(seq_or) {
         Ok(ast)
     } else {
-        Err(Box::new(ParseError::Empty))
+        Err(ParseError::Empty)
     }
 }
