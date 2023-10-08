@@ -2,7 +2,7 @@ use super::{parser::AST, Instruction};
 use crate::helper::safe_add;
 use std::{
     error::Error,
-    fmt::{self, write, Display},
+    fmt::{self, Display},
 };
 
 #[derive(Debug)]
@@ -39,13 +39,35 @@ impl Generator {
 
     fn gen_expr(&mut self, ast: &AST) -> Result<(), CodeGenError> {
         match ast {
-            AST::Char(c) => self.gen_char(*c),
+            AST::Char(c) => self.gen_char(*c)?,
             AST::Or(e1, e2) => self.gen_or(e1, e2)?,
             AST::Plus(e) => self.gen_plus(e)?,
-            AST::Star(e) => self.gen_star(e)?,
+            AST::Star(e1) => match &**e1 {
+                AST::Star(_) => self.gen_expr(&e1)?,
+                AST::Seq(e2) if e2.len() == 1 => {
+                    if let Some(e3 @ AST::Star(_)) = e2.get(0) {
+                        self.gen_expr(e3)?
+                    } else {
+                        self.gen_star(e1)?
+                    }
+                }
+                e => self.gen_star(&e)?,
+            },
             AST::Question(e) => self.gen_question(e)?,
-            AST::Seq(v) => self.ge_seq(v)?,
+            AST::Seq(v) => self.gen_seq(v)?,
         }
+
+        Ok(())
+    }
+
+    fn gen_plus(&mut self, e: &AST) -> Result<(), CodeGenError> {
+        let l1 = self.pc;
+        self.gen_expr(e)?;
+
+        self.inc_pc()?;
+        let split = Instruction::Split(l1, self.pc);
+
+        self.insts.push(split);
 
         Ok(())
     }
@@ -129,5 +151,21 @@ impl Generator {
         }
 
         Ok(())
+    }
+
+    fn gen_question(&mut self, e: &AST) -> Result<(), CodeGenError> {
+        let split_addr = self.pc;
+        self.inc_pc();
+        let split = Instruction::Split(self.pc, 0);
+        self.insts.push(split);
+
+        self.gen_expr(e)?;
+
+        if let Some(Instruction::Split(_, l2)) = self.insts.get_mut(split_addr) {
+            *l2 = self.pc;
+            Ok(())
+        } else {
+            Err(CodeGenError::FailQuestion)
+        }
     }
 }

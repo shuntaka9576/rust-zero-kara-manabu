@@ -1,7 +1,9 @@
-use std::fmt::Display;
-
 mod codegen;
+mod evaluator;
 mod parser;
+
+use crate::helper::DynError;
+use std::fmt::Display;
 
 #[derive(Debug)]
 pub enum Instruction {
