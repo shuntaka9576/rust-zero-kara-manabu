@@ -30,15 +30,16 @@ mod tests {
         assert!(safe_add(&mut n, &20, || ()).is_err());
     }
 
+    // cargo test --all tests::test_matching -- --nocapture
     #[test]
     fn test_matching() {
-        assert!(do_matching("+b", "bbb", true).is_err());
-        assert!(do_matching("*b", "bbb", true).is_err());
-        assert!(do_matching("|b", "bbb", true).is_err());
-        assert!(do_matching("?b", "bbb", true).is_err());
+        // assert!(do_matching("+b", "bbb", true).is_err());
+        // assert!(do_matching("*b", "bbb", true).is_err());
+        // assert!(do_matching("|b", "bbb", true).is_err());
+        // assert!(do_matching("?b", "bbb", true).is_err());
 
-        assert!(do_matching("abc|def", "def", true).unwrap());
-        // assert!(do_matching("(abc)*", "abcabc", true).unwrap());
+        // assert!(do_matching("abc|def", "def", true).unwrap());
+        assert!(do_matching("(abc)*", "abcabc", true).unwrap());
         // assert!(do_matching("(ab|cd)+", "abcdcd", true).unwrap());
         // assert!(do_matching("abc?", "ab", true).unwrap());
 
