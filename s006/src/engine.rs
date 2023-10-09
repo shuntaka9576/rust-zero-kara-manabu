@@ -51,3 +51,18 @@ pub fn do_matching(expr: &str, line: &str, is_depth: bool) -> Result<bool, DynEr
     let line = line.chars().collect::<Vec<char>>();
     Ok(evaluator::eval(&code, &line, is_depth)?)
 }
+
+pub fn print(expr: &str) -> Result<(), DynError> {
+    println!("expr: ${expr}");
+    let ast = parser::parse(expr)?;
+    println!("AST: {:?}", ast);
+
+    println!();
+    println!("code:");
+    let code = codegen::get_code(&ast)?;
+    for (n, c) in code.iter().enumerate() {
+        println!("{:>04}: {c}", n);
+    }
+
+    Ok(())
+}
