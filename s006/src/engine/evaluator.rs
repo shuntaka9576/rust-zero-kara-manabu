@@ -104,6 +104,12 @@ fn eval_width(inst: &[Instruction], line: &[char]) -> Result<bool, EvalError> {
                             pop_ctx(&mut pc, &mut sp, &mut ctx)?;
                         }
                     }
+                } else {
+                    if ctx.is_empty() {
+                        return  Ok(false);;
+                    } else {
+                        pop_ctx(&mut pc, &mut sp, &mut ctx)?;
+                    }
                 }
             }
             Instruction::Match => {

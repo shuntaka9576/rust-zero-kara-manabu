@@ -14,6 +14,8 @@ pub enum AST {
     Seq(Vec<AST>),
 }
 
+impl Error for ParseError {}
+
 #[derive(Debug)]
 pub enum ParseError {
     InvalidEscape(usize, char), // 誤ったエスケープシーケンス

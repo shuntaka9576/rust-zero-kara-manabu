@@ -28,7 +28,20 @@ struct Generator {
     insts: Vec<Instruction>,
 }
 
+pub fn get_code(ast: &AST) -> Result<Vec<Instruction>, CodeGenError> {
+    let mut generator = Generator::default();
+    generator.get_code(ast)?;
+    Ok(generator.insts)
+}
+
 impl Generator {
+    fn get_code(&mut self, ast: &AST) -> Result<(), CodeGenError> {
+        self.gen_expr(ast)?;
+        self.inc_pc()?;
+        self.insts.push(Instruction::Match);
+        Ok(())
+    }
+
     // 命令が1つ生成されるとpcの値がインクリメントされ、そのみいれいがinputsにプッシュされる
     // インクリメントにはsafe_add関数を用い、オーバーフローによる不正な動作を検知
     fn inc_pc(&mut self) -> Result<(), CodeGenError> {
