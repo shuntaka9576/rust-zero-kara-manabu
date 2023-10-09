@@ -35,16 +35,20 @@ fn eval_depth(
             return Err(EvalError::InvalidPC);
         };
 
+        println!("next {:?}", next);
         match next {
             Instruction::Char(c) => {
                 if let Some(sp_c) = line.get(sp) {
+                    println!("Instruction::Char c: {c} sp: {sp} sp_c: {sp_c}");
                     if c == sp_c {
                         safe_add(&mut pc, &1, || EvalError::PCOverFlow)?;
-                        safe_add(&mut pc, &1, || EvalError::SPOverFlow)?;
+                        safe_add(&mut sp, &1, || EvalError::SPOverFlow)?;
                     } else {
+                        println!("ok false 1");
                         return Ok(false);
                     }
                 } else {
+                    println!("ok false 2");
                     return Ok(false);
                 }
             }
@@ -55,11 +59,18 @@ fn eval_depth(
                 pc = *addr;
             }
             Instruction::Split(addr1, addr2) => {
-                if eval_depth(inst, line, *addr1, sp)? || eval_depth(inst, line, *addr2, sp)? {
-                    return Ok(true);
-                } else {
-                    return Ok(false);
-                }
+                // let an1 = eval_depth(inst, line, *addr1, sp)?;
+                let an2 = eval_depth(inst, line, *addr2, sp)?; // trueになるべき
+                                                               // println!("an1: {an1}, an2: {an2}");
+                println!("an2: {an2}");
+
+                return Ok(true);
+                // if eval_depth(inst, line, *addr1, sp)? || eval_depth(inst, line, *addr2, sp)? {
+                //     return Ok(true);
+                // } else {
+                //     println!("ok false 3");
+                //     return Ok(false);
+                // }
             }
         }
     }
