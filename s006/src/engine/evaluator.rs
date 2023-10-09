@@ -35,20 +35,16 @@ fn eval_depth(
             return Err(EvalError::InvalidPC);
         };
 
-        println!("next {:?}", next);
         match next {
             Instruction::Char(c) => {
                 if let Some(sp_c) = line.get(sp) {
-                    println!("Instruction::Char sp:{sp} pc:{pc} c:{c} sp_c:{sp_c}");
                     if c == sp_c {
                         safe_add(&mut pc, &1, || EvalError::PCOverFlow)?;
                         safe_add(&mut sp, &1, || EvalError::SPOverFlow)?;
                     } else {
-                        println!("ok false 1");
                         return Ok(false);
                     }
                 } else {
-                    println!("ok false 2");
                     return Ok(false);
                 }
             }
@@ -62,7 +58,6 @@ fn eval_depth(
                 if eval_depth(inst, line, *addr1, sp)? || eval_depth(inst, line, *addr2, sp)? {
                     return Ok(true);
                 } else {
-                    println!("ok false 3");
                     return Ok(false);
                 }
             }
@@ -138,7 +133,6 @@ fn eval_width(inst: &[Instruction], line: &[char]) -> Result<bool, EvalError> {
 }
 
 pub fn eval(inst: &[Instruction], line: &[char], is_depth: bool) -> Result<bool, EvalError> {
-    println!("start eval, is_depth: {is_depth}");
     if is_depth {
         eval_depth(inst, line, 0, 0)
     } else {
