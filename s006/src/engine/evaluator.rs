@@ -39,7 +39,7 @@ fn eval_depth(
         match next {
             Instruction::Char(c) => {
                 if let Some(sp_c) = line.get(sp) {
-                    println!("Instruction::Char c: {c} sp: {sp} sp_c: {sp_c}");
+                    println!("Instruction::Char sp:{sp} pc:{pc} c:{c} sp_c:{sp_c}");
                     if c == sp_c {
                         safe_add(&mut pc, &1, || EvalError::PCOverFlow)?;
                         safe_add(&mut sp, &1, || EvalError::SPOverFlow)?;
@@ -59,18 +59,12 @@ fn eval_depth(
                 pc = *addr;
             }
             Instruction::Split(addr1, addr2) => {
-                // let an1 = eval_depth(inst, line, *addr1, sp)?;
-                let an2 = eval_depth(inst, line, *addr2, sp)?; // trueになるべき
-                                                               // println!("an1: {an1}, an2: {an2}");
-                println!("an2: {an2}");
-
-                return Ok(true);
-                // if eval_depth(inst, line, *addr1, sp)? || eval_depth(inst, line, *addr2, sp)? {
-                //     return Ok(true);
-                // } else {
-                //     println!("ok false 3");
-                //     return Ok(false);
-                // }
+                if eval_depth(inst, line, *addr1, sp)? || eval_depth(inst, line, *addr2, sp)? {
+                    return Ok(true);
+                } else {
+                    println!("ok false 3");
+                    return Ok(false);
+                }
             }
         }
     }
