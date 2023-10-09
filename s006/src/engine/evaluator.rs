@@ -106,7 +106,7 @@ fn eval_width(inst: &[Instruction], line: &[char]) -> Result<bool, EvalError> {
                     }
                 } else {
                     if ctx.is_empty() {
-                        return  Ok(false);;
+                        return Ok(false);
                     } else {
                         pop_ctx(&mut pc, &mut sp, &mut ctx)?;
                     }
@@ -133,6 +133,7 @@ fn eval_width(inst: &[Instruction], line: &[char]) -> Result<bool, EvalError> {
 }
 
 pub fn eval(inst: &[Instruction], line: &[char], is_depth: bool) -> Result<bool, EvalError> {
+    println!("start eval, is_depth: {is_depth}");
     if is_depth {
         eval_depth(inst, line, 0, 0)
     } else {
