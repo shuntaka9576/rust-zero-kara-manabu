@@ -50,6 +50,12 @@ pub fn do_matching(expr: &str, line: &str, is_depth: bool) -> Result<bool, DynEr
     let code = codegen::get_code(&ast)?;
     let line = line.chars().collect::<Vec<char>>();
 
+    println!("---");
+    println!("expr: {expr}");
+    println!("ast: {:?}", ast);
+    println!("code: {:?}", code);
+    println!("---");
+
     Ok(evaluator::eval(&code, &line, is_depth)?)
 }
 

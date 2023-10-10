@@ -42,6 +42,7 @@ mod tests {
         assert!(do_matching("(abc)*", "abcabc", true).unwrap());
         assert!(do_matching("(ab|cd)+", "abcdcd", true).unwrap());
         assert!(do_matching("abc?", "ab", true).unwrap());
+        assert!(do_matching("abc+", "abc", true).unwrap());
 
         assert!(!do_matching("abc|def", "efa", true).unwrap());
         assert!(!do_matching("(ab|cd)+", "", true).unwrap());
