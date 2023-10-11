@@ -166,6 +166,115 @@ impl Worker {
         }
     }
 
+    fn built_in_cmd(&mut self, cmd: &[(&str, Vec<&str>)], shell_tx: &SyncSender<ShellMsg>) -> bool {
+        if cmd.len() > 1 {
+            return false;
+        }
+
+        match cmd[0].0 {
+            "exit" => self.run_exit(&cmd[0].1, shell_tx),
+            "jobs" => self.run_jobs(shell_tx),
+            "fg" => self.run_fg(&cmd[0].1, shell_tx),
+            "cd" => self.run_cd(&cmd[0].1, shell_tx),
+            _ => false,
+        }
+    }
+
+    fn run_cd(&mut self, args: &[&str], shell_tx: &SyncSender<ShellMsg>) -> bool {
+        let path = if args.len() == 1 {
+            dirs::home_dir()
+                .or_else(|| Some(PathBuf::from("/")))
+                .unwrap()
+        } else {
+            PathBuf::from(args[1])
+        };
+
+        if let Err(e) = std::env::set_current_dir(&path) {
+            self.exit_val = 1;
+            eprintln!("cdに失敗: {e}");
+        } else {
+            self.exit_val = 0;
+        }
+
+        shell_tx.send(ShellMsg::Continue(self.exit_val)).unwrap();
+        true
+    }
+
+    fn run_exit(&mut self, args: &[&str], shell_tx: &SyncSender<ShellMsg>) -> bool {
+        if !self.jobs.is_empty() {
+            eprintln!("ジョブが実行中なので終了できません");
+            self.exit_val = 1;
+            shell_tx.send(ShellMsg::Continue(self.exit_val)).unwrap();
+            return true;
+        }
+
+        let exit_val = if let Some(s) = args.get(1) {
+            if let Ok(n) = (*s).parse::<i32>() {
+                n
+            } else {
+                eprintln!("{s}は不正な引数です");
+                self.exit_val = 1;
+                shell_tx.send(ShellMsg::Continue(self.exit_val)).unwrap();
+                return true;
+            }
+        } else {
+            self.exit_val
+        };
+
+        shell_tx.send(ShellMsg::Quit(exit_val)).unwrap();
+
+        true
+    }
+
+    fn run_jobs(&mut self, shell_tx: &SyncSender<ShellMsg>) -> bool {
+        for (job_id, (pgid, cmd)) in &self.jobs {
+            let state = if self.is_group_stop(*pgid).unwrap() {
+                "停止中"
+            } else {
+                "実行中"
+            };
+            println!("[{job_id}] {state}\t{cmd}")
+        }
+        self.exit_val = 0;
+        shell_tx.send(ShellMsg::Continue(self.exit_val)).unwrap();
+        true
+    }
+
+    fn run_fg(&mut self, args: &[&str], shell_tx: &SyncSender<ShellMsg>) -> bool {
+        self.exit_val = 1;
+
+        if args.len() < 2 {
+            eprintln!("usage: fg 数字");
+            shell_tx.send(ShellMsg::Continue(self.exit_val)).unwrap();
+            return true;
+        }
+
+        if let Ok(n) = args[1].parse::<usize>() {
+            if let Some((pgid, cmd)) = self.jobs.get(&n) {
+                eprintln!("[{n}]　再開\t{cmd}");
+
+                self.fg = Some(*pgid);
+                tcsetpgrp(libc::STDIN_FILENO, *pgid).unwrap();
+
+                killpg(*pgid, Signal::SIGCONT).unwrap();
+                return true;
+            }
+        }
+
+        eprintln!("{}というジョブは見つかりませんでした", args[1]);
+        shell_tx.send(ShellMsg::Continue(self.exit_val)).unwrap();
+        true
+    }
+
+    fn is_group_stop(&self, pgid: Pid) -> Option<bool> {
+        for pid in self.pgid_to_pids.get(&pgid)?.1.iter() {
+            if self.pid_to_info.get(pid).unwrap().state == ProcState::Run {
+                return Some(false);
+            }
+        }
+        Some(true)
+    }
+
     fn spawn(mut self, worker_rx: Receiver<WorkerMsg>, shell_tx: SyncSender<ShellMsg>) {
         thread::spawn(move || {
             for msg in worker_rx.iter() {
@@ -173,7 +282,9 @@ impl Worker {
                     WorkerMsg::Cmd(line) => {
                         match parse_cmd(&line) {
                             Ok(cmd) => {
-                                // TODO
+                                if self.built_in_cmd(&cmd, &shell_tx) {
+                                    continue;
+                                }
                             }
                             Err(e) => {
                                 // TODO
