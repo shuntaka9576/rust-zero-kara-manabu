@@ -1,6 +1,5 @@
 mod engine;
 mod helper;
-mod shell;
 
 use helper::DynError;
 use std::{
