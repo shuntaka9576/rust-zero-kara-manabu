@@ -119,10 +119,10 @@ impl Shell {
 }
 
 fn spawn_sig_handler(tx: Sender<WorkerMsg>) -> Result<(), DynError> {
-    let mut signals = Signal::new(&[SIGINT, SIGTSTP, SIGCHLD])?;
+    let mut signals = Signals::new(&[SIGINT, SIGTSTP, SIGCHLD])?;
     thread::spawn(move || {
         for sig in signals.forever() {
-            tx.send(WorkerMsg::Signal(sig).unwrap())
+            tx.send(WorkerMsg::Signal(sig)).unwrap()
         }
     });
 
@@ -170,28 +170,48 @@ impl Worker {
         thread::spawn(move || {
             for msg in worker_rx.iter() {
                 match msg {
-                    WorkerMsg::Cmd(line) => match parse_cmd(&line) {
-                        Ok(cmd) => {
-                            if self.built_in_cmd(&cmd, &shell_tx) {
-                                continue;
+                    WorkerMsg::Cmd(line) => {
+                        match parse_cmd(&line) {
+                            Ok(cmd) => {
+                                // TODO
                             }
-
-                            if !self.spawn_child(&line, &cmd) {
-                                shell_tx.send(ShellMsg::Continue(self.exit_val)).unwrap()
+                            Err(e) => {
+                                // TODO
                             }
                         }
-                        Err(e) => {
-                            eprintln!("ZeroSh: {e}");
-                            shell_tx.send(ShellMsg::Continue(self.exit_val)).unwrap();
-                        }
-                    },
+                    }
                     WorkerMsg::Signal(SIGCHILD) => {
                         self.wait_child(&shell_tx);
                     }
-                    _ => (), // 無視
+                    _ => (),
                 }
             }
-        })
+            // for msg in worker_rx.iter() {
+            //     match msg {
+            //         WorkerMsg::Cmd(line) => match parse_cmd(&line) {
+            //             match parse_cmd(&line) {
+
+            //             Ok(cmd) => {
+            //                 if self.built_in_cmd(&cmd, &shell_tx) {
+            //                     continue;
+            //                 }
+
+            //                 if !self.spawn_child(&line, &cmd) {
+            //                     shell_tx.send(ShellMsg::Continue(self.exit_val)).unwrap()
+            //                 }
+            //             }
+            //             Err(e) => {
+            //                 eprintln!("ZeroSh: {e}");
+            //                 shell_tx.send(ShellMsg::Continue(self.exit_val)).unwrap();
+            //             }
+            //         },
+            //         WorkerMsg::Signal(SIGCHILD) => {
+            //             self.wait_child(&shell_tx);
+            //         }
+            //         _ => (), // 無視
+            //     }
+            // }
+        });
     }
 }
 
