@@ -1,6 +1,6 @@
 use crate::helper::DynError;
 use nix::{
-    libc,
+    libc::{self, FSOPT_REPORT_FULLSIZE},
     sys::{
         signal::{killpg, signal, SigHandler, Signal},
         wait::{waitpid, WaitPidFlag, WaitStatus},
@@ -16,7 +16,6 @@ use std::{
     mem::replace,
     path::PathBuf,
     process::exit,
-    str::pattern::Pattern,
     sync::mpsc::{channel, sync_channel, Receiver, Sender, SyncSender},
     thread,
 };
@@ -297,71 +296,116 @@ impl Worker {
                     _ => (),
                 }
             }
-            // for msg in worker_rx.iter() {
-            //     match msg {
-            //         WorkerMsg::Cmd(line) => match parse_cmd(&line) {
-            //             match parse_cmd(&line) {
-
-            //             Ok(cmd) => {
-            //                 if self.built_in_cmd(&cmd, &shell_tx) {
-            //                     continue;
-            //                 }
-
-            //                 if !self.spawn_child(&line, &cmd) {
-            //                     shell_tx.send(ShellMsg::Continue(self.exit_val)).unwrap()
-            //                 }
-            //             }
-            //             Err(e) => {
-            //                 eprintln!("ZeroSh: {e}");
-            //                 shell_tx.send(ShellMsg::Continue(self.exit_val)).unwrap();
-            //             }
-            //         },
-            //         WorkerMsg::Signal(SIGCHILD) => {
-            //             self.wait_child(&shell_tx);
-            //         }
-            //         _ => (), // 無視
-            //     }
-            // }
         });
+    }
+
+    fn remove_pid(&mut self, pid: Pid) -> Option<(usize, Pid)> {
+        let pgid = self.pid_to_info.get(&pid)?.pgid;
+        let it = self.pgid_to_pids.get_mut(&pgid)?;
+        it.1.remove(&pid);
+        let job_id = it.0;
+        Some((job_id, pgid))
+    }
+
+    fn manage_job(&mut self, job_id: usize, pgid: Pid, shell_tx: &SyncSender<ShellMsg>) {
+        let is_fg = self.fg.map_or(false, |x| pgid == x);
+        let line = &self.jobs.get(&job_id).unwrap().1;
+        if is_fg {
+            if self.is_group_empty(pgid) {}
+        }
+    }
+
+    fn is_group_empty(&self, pgid: Pid) -> bool {
+        self.pgid_to_pids.get(&pgid).unwrap().1.is_empty()
+    }
+
+    fn process_term(&mut self, pid: Pid, shell_tx: &SyncSender<ShellMsg>) {
+        if let Some((job_id, pgid)) = self.remove_pid(pid) {
+            self.manage_job(job_id, pgid, shell_tx)
+        }
+    }
+
+    fn set_pid_state(&mut self, pid: Pid, state: ProcState) -> Option<ProcState> {
+        let info = self.pid_to_info.get_mut(&pid)?;
+        Some(replace(&mut info.state, state))
+    }
+
+    fn process_stop(&mut self, pid: Pid, shell_tx: &SyncSender<ShellMsg>) {
+        self.set_pid_state(pid, ProcState::Stop);
+        let pgid = self.pid_to_info.get(&pid).unwrap().pgid;
+        let job_id = self.pgid_to_pids.get(&pgid).unwrap().0;
+        self.manage_job(job_id, pgid, shell_tx);
+    }
+
+    fn process_continue(&mut self, pid: Pid) {
+        self.set_pid_state(pid, ProcState::Run);
+    }
+
+    fn wait_child(&mut self, shell_tx: &SyncSender<ShellMsg>) {
+        let flag = Some(WaitPidFlag::WUNTRACED | WaitPidFlag::WNOHANG | WaitPidFlag::WCONTINUED);
+
+        loop {
+            match syscall(|| waitpid(Pid::from_raw(-1), flag)) {
+                Ok(WaitStatus::Exited(pid, status)) => {
+                    self.exit_val = status;
+                    self.process_term(pid, shell_tx);
+                }
+                Ok(WaitStatus::Signaled(pid, sig, core)) => {
+                    eprintln!(
+                        "\nZeroSh: 子プロセスがシグナルにより終了{}: pid = {pid}, signal = {sig}",
+                        if core { "(コアダンプ)" } else { "" }
+                    )
+                }
+                Ok(WaitStatus::Stopped(pid, _sig)) => self.process_stop(pid, shell_tx),
+                Ok(WaitStatus::Continued(pid)) => self.process_continue(pid),
+                Ok(WaitStatus::StillAlive) => return,
+                Err(nix::Error::ECHILD) => return,
+                Err(e) => {
+                    eprintln!("\nZeroSh: waitが失敗: {e}");
+                    exit(1);
+                } // #[cfg(ayn(target_os = "linux", target_os = "android"))]
+                  // Ok(WaitStatus::PtraceEvent(pid, _, _) | WaitStatus)
+            }
+        }
     }
 }
 
-// type CmdResult<'a> = Result<Vec<(&'a str, Vec<&'a str>)>, DynError>;
-//
-// fn parse_cmd_one(line: &str) -> Result<(&str, Vec<&str>), DynError> {
-//     let cmd: Vec<&str> = line.split(' ').collect();
-//     let mut filename = "";
-//     let mut args = Vec::new();
-//     for (n, s) in cmd.iter().filter(|s| !s.is_empty()).enumerate() {
-//         if n == 0 {
-//             filename = *s;
-//         }
-//         args.push(*s)
-//     }
-//
-//     if filename.is_empty() {
-//         Err("空のコマンド".into())
-//     } else {
-//         Ok((filename, args))
-//     }
-// }
-//
-// fn parse_pipe(line: &str) -> Vec<&str> {
-//     let cmds: Vec<&str> = line.split('|').collect();
-//     cmds
-// }
+type CmdResult<'a> = Result<Vec<(&'a str, Vec<&'a str>)>, DynError>;
 
-// fn parse_cmd(line: &str) -> CmdResult {
-//     let cmds = parse_pipe(line);
-//     if cmds.is_empty() {
-//         return Err("空のコマンド".into());
-//     }
-//
-//     let mut result = Vec::new();
-//     for cmd in cmds {
-//         let (filename, args) = parse_cmd_one(cmd)?;
-//         result.push((filename, args))
-//     }
-//
-//     Ok(result)
-// }
+fn parse_cmd_one(line: &str) -> Result<(&str, Vec<&str>), DynError> {
+    let cmd: Vec<&str> = line.split(' ').collect();
+    let mut filename = "";
+    let mut args = Vec::new();
+    for (n, s) in cmd.iter().filter(|s| !s.is_empty()).enumerate() {
+        if n == 0 {
+            filename = *s;
+        }
+        args.push(*s)
+    }
+
+    if filename.is_empty() {
+        Err("空のコマンド".into())
+    } else {
+        Ok((filename, args))
+    }
+}
+
+fn parse_pipe(line: &str) -> Vec<&str> {
+    let cmds: Vec<&str> = line.split('|').collect();
+    cmds
+}
+
+fn parse_cmd(line: &str) -> CmdResult {
+    let cmds = parse_pipe(line);
+    if cmds.is_empty() {
+        return Err("空のコマンド".into());
+    }
+
+    let mut result = Vec::new();
+    for cmd in cmds {
+        let (filename, args) = parse_cmd_one(cmd)?;
+        result.push((filename, args))
+    }
+
+    Ok(result)
+}
