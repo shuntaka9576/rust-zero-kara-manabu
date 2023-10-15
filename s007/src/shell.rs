@@ -20,15 +20,19 @@ use std::{
     thread,
 };
 
-fn syscall<F, T>(f: F) -> Result<T, nix::Error>
+struct CleanUp<F>
 where
-    F: Fn() -> Result<T, nix::Error>,
+    F: Fn(),
 {
-    loop {
-        match f() {
-            Err(nix::Error::EINTR) => (), // リトライ
-            result => return result,
-        }
+    f: F,
+}
+
+impl<F> Drop for CleanUp<F>
+where
+    F: Fn(),
+{
+    fn drop(&mut self) {
+        (self.f)()
     }
 }
 
@@ -48,6 +52,18 @@ pub struct Shell {
     logfile: String,
 }
 
+fn syscall<F, T>(f: F) -> Result<T, nix::Error>
+where
+    F: Fn() -> Result<T, nix::Error>,
+{
+    loop {
+        match f() {
+            Err(nix::Error::EINTR) => (), // リトライ
+            result => return result,
+        }
+    }
+}
+
 impl Shell {
     pub fn new(logfile: &str) -> Self {
         Shell {
@@ -56,6 +72,7 @@ impl Shell {
     }
 
     pub fn run(&self) -> Result<(), DynError> {
+        // SGITTOUを無視に設定しないと、SIGTSTPが配送される
         unsafe { signal(Signal::SIGTTOU, SigHandler::SigIgn).unwrap() };
 
         let mut rl = Editor::<()>::new()?;
