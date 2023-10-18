@@ -3,7 +3,7 @@ use rustyline::{error::ReadlineError, Editor};
 use signal_hook::iterator::Signals;
 use std::{
     error::Error,
-    sync::mpsc::{channel, sync_channel, Sender},
+    sync::mpsc::{channel, sync_channel, Receiver, Sender},
     thread,
 };
 
@@ -29,6 +29,7 @@ fn main() -> Result<(), DynError> {
     // TODO recipeverの処理だけ書く(worker::newのspawnはリッチだからまず受け取るだけのものを書く)
 
     let line = "aaa".to_string();
+    spawn_sample(worker_rx);
 
     loop {
         let readline = rl.readline(">> ");
@@ -68,4 +69,21 @@ fn spawn_sig_handler(tx: Sender<WorkerMsg>) -> Result<(), DynError> {
     });
 
     Ok(())
+}
+
+fn spawn_sample(worker_rx: Receiver<WorkerMsg>) -> Result<(), DynError> {
+    thread::spawn(move || {
+        for msg in worker_rx.iter() {
+            match msg {
+                WorkerMsg::Cmd(line) => {
+                    println!("receive: {line}");
+                }
+                _ => {
+                    println!("other");
+                }
+            }
+        }
+    });
+
+    return Ok(());
 }
